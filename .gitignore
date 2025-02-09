@@ -1,0 +1,65 @@
+# Compiled binaries
+stop-loss
+price-simulator
+
+# Go modules cache
+go.mod
+go.sum
+
+# Dependencies
+vendor/
+
+# Temporary files and directories
+tmp/
+.DS_Store  # macOS specific
+__pycache__/ # Python specific
+*.swp       # Vim swap files
+*.swo       # Vim swap files
+.vscode/     # VS Code specific settings
+
+# Logs and data files
+*.db      # SQLite database files (as you correctly pointed out)
+*.log
+
+# Docker related
+.dockerignore
+.env
+
+# OS specific files
+.localized
+
+# IDE specific files (adjust as needed)
+.idea/      # IntelliJ IDEA
+.project    # Eclipse
+.settings   # Eclipse
+
+# Archive files
+*.zip
+*.tar
+*.gz
+
+# Ignore build artifacts
+build/
+dist/
+
+# Coverage files
+*.out
+*.coverprofile
+
+# Cache directories (adjust as needed)
+.cache/
+
+# Personal files that shouldn't be shared
+.bash_history
+.zsh_history
+
+# Sensitive information - NEVER commit these
+*.key
+*.pem
+*.crt
+
+# If you use a frontend framework (e.g., React, Angular, Vue), add:
+node_modules/
+dist/  # or build/ or public/ - your frontend build directory
+
+# If you use any specific tooling, add their directories/files here.
