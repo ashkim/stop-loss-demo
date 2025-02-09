@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stop-Loss Order System</title>
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        form label { display: block; margin-bottom: 5px; }
+        form input, form button { margin-bottom: 10px; padding: 8px; }
+        #order-status-area { margin-top: 20px; border: 1px solid #ccc; padding: 10px; }
+        .order-item { border-bottom: 1px dashed #eee; padding-bottom: 10px; margin-bottom: 10px; }
+        .order-item:last-child { border-bottom: none; }
+        .order-status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 0.8em;
+            background-color: #eee;
+            color: #333;
+        }
+        .status-active { background-color: lightgreen; color: darkgreen; }
+        .status-triggered { background-color: lightcoral; color: darkred; }
+        .status-canceled { background-color: lightgray; color: gray; }
+        .cancel-button { padding: 5px 10px; background-color: #f44336; color: white; border: none; cursor: pointer; border-radius: 5px; font-size: 0.9em; }
+        .cancel-button:hover { background-color: #d32f2f; }
+
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Stop-Loss Order Management</h1>
+    </header>
+
+    {{ template "content" . }}  <footer>
+        <p>&copy; 2024 Your Name - Interview Test</p>
+    </footer>
+</body>
+</html>

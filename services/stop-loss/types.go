@@ -8,9 +8,9 @@ type Order struct {
 	Status   string  `json:"status"` // pending, executed, cancelled
 }
 
-// DataStore interface
 type DataStore interface {
 	CreateOrder(order *Order) error
 	GetOrders() ([]Order, error)
-	// ... other data access methods
+	CancelOrder(id int) error
+	UpdateOrderStatus(status string) error
 }

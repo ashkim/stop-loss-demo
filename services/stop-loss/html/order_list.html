@@ -1,0 +1,10 @@
+{{ define "order_list" }}
+    <div>
+        {{ if not . }}
+            <p>No stop-loss orders placed yet.</p>
+        {{ else }}
+            {{ range . }}
+                {{ template "order_item" . }} {{ end }}
+        {{ end }}
+    </div>
+{{ end }}
