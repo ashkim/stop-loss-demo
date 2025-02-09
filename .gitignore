@@ -1,7 +1,3 @@
-# Compiled binaries
-stop-loss
-price-simulator
-
 # Go modules cache
 go.mod
 go.sum
