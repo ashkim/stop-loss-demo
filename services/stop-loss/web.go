@@ -15,27 +15,24 @@ import (
 	"go.temporal.io/sdk/client"
 )
 
-// WebServer struct now holds template, temporal client, and order service
 type WebServer struct {
-	template       *template.Template
-	temporalClient client.Client
-	orderService   OrderServiceInterface // Use the interface
+	template             *template.Template
+	orderWorkflowService OrderWorkflowService
+	ordersRepo           OrdersRepo
 }
 
-// NewWebServer constructor
-func NewWebServer(tpl *template.Template, tc client.Client, os OrderServiceInterface) *WebServer {
+func NewWebServer(tpl *template.Template, tc client.Client, repo OrdersRepo, orderWorkflowService OrderWorkflowService) *WebServer {
 	return &WebServer{
-		template:       tpl,
-		temporalClient: tc,
-		orderService:   os,
+		template:             tpl,
+		ordersRepo:           repo,
+		orderWorkflowService: orderWorkflowService,
 	}
 }
 
-// SetupRoutes configures the HTTP routes using methods on WebServer
 func (s *WebServer) SetupRoutes(mux *mux.Router) {
 	mux.HandleFunc("/", s.handleIndex).Methods("GET")
 	mux.HandleFunc("/orders", s.handleCreateOrder).Methods("POST")
-	mux.HandleFunc("/orders", s.handleListOrders).Methods("GET")               // redundant? consider removing
+	mux.HandleFunc("/orders", s.handleListOrders).Methods("GET")
 	mux.HandleFunc("/orders/{id}/cancel", s.handleCancelOrder).Methods("POST") // Cancellation endpoint
 	mux.HandleFunc("/orders/{id}", s.handleGetOrder).Methods("GET")
 	mux.HandleFunc("/sse-orders", s.handleSSEOrders).Methods("GET") // SSE endpoint
@@ -44,7 +41,7 @@ func (s *WebServer) SetupRoutes(mux *mux.Router) {
 // handleIndex renders the main index page
 func (s *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	log.Println("Loading index page")
-	orders, err := s.orderService.ListOrders()
+	orders, err := s.ordersRepo.ListOrders()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to load orders: %v", err), http.StatusInternalServerError)
 		return
@@ -56,7 +53,6 @@ func (s *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleCreateOrder handles order placement via form submission
 func (s *WebServer) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Error parsing form", http.StatusBadRequest)
@@ -66,6 +62,8 @@ func (s *WebServer) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	security := r.FormValue("security")
 	priceStr := r.FormValue("price")
 	quantityStr := r.FormValue("quantity")
+
+	// TODO: add known security validation
 
 	price, err := strconv.ParseFloat(priceStr, 64)
 	if err != nil {
@@ -84,39 +82,14 @@ func (s *WebServer) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		Security:  security,
 		StopPrice: price,
 		Quantity:  quantity,
-		Status:    OrderStatusPending, // Initial status
+		Status:    OrderStatusPending,
 	}
 
-	createdOrder, err := s.orderService.CreateOrder(order)
+	err = s.orderWorkflowService.CreateOrder(r.Context(), order)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to create order: %v", err), http.StatusInternalServerError)
 		return
 	}
-
-	workflowOptions := client.StartWorkflowOptions{
-		ID:                    fmt.Sprintf("stop-loss-workflow-%s", orderID), // Unique workflow ID
-		TaskQueue:             "stop-loss-task-queue",                        // Same task queue as worker
-		WorkflowIDReusePolicy: client.WorkflowIDReusePolicyAllowDuplicate,
-	}
-
-	workflowRun, err := s.temporalClient.ExecuteWorkflow(r.Context(), workflowOptions, StopLossWorkflow, createdOrder.ID, createdOrder.Security, createdOrder.StopPrice, createdOrder.Quantity)
-	if err != nil {
-		// On workflow start failure, consider reverting order creation or marking it as failed in service
-		log.Printf("Failed to start StopLossWorkflow for order %s: %v", createdOrder.ID, err)
-		http.Error(w, "Failed to start order workflow", http.StatusInternalServerError)
-		return
-	}
-	log.Printf("Started workflow for order ID: %s, WorkflowID: %s, RunID: %s", createdOrder.ID, workflowRun.GetID(), workflowRun.GetRunID())
-
-	err = s.orderService.AssociateWorkflowID(createdOrder.ID, workflowRun.GetID())
-	if err != nil {
-		log.Printf("Failed to associate workflow ID with order %s: %v", createdOrder.ID, err)
-		// Log the error, but workflow is already running. Consider implications for tracking/cancellation if association fails.
-	}
-
-	// Respond with updated order list via SSE - or just redirect to refresh the order list
-	s.renderOrderList(w, r) // Re-render and send updated order list
-
 }
 
 // handleListOrders fetches and renders the list of orders (used by SSE and initial load)
@@ -125,15 +98,14 @@ func (s *WebServer) handleListOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *WebServer) renderOrderList(w http.ResponseWriter, r *http.Request) {
-	orders, err := s.orderService.ListOrders()
+	orders, err := s.ordersRepo.ListOrders()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to load orders: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	data := IndexPageData{Orders: orders}
 	var listBuffer bytes.Buffer
-	err = s.template.ExecuteTemplate(&listBuffer, "order_list.html", data.Orders) // Render just the order list part
+	err = s.template.ExecuteTemplate(&listBuffer, "order_list.html", orders) // Render just the order list part
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Template execution error for order list: %v", err), http.StatusInternalServerError)
 		return
@@ -149,12 +121,13 @@ func (s *WebServer) handleCancelOrder(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	orderID := vars["id"]
 
-	order, err := s.orderService.GetOrder(orderID)
+	order, err := s.ordersRepo.GetOrder(orderID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Order not found: %v", err), http.StatusNotFound)
 		return
 	}
 
+	// TODO: probably a race condition here
 	if order.Status != OrderStatusPending {
 		http.Error(w, "Order cannot be cancelled as it is not pending.", http.StatusBadRequest)
 		return
@@ -166,19 +139,11 @@ func (s *WebServer) handleCancelOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Signal the workflow to cancel
-	err = s.temporalClient.SignalWorkflow(r.Context(), workflowID, "", CancelOrderSignalName, nil)
+	err = s.orderWorkflowService.CancelOrder(r.Context(), workflowID)
 	if err != nil {
-		log.Printf("Error signaling workflow %s to cancel: %v", workflowID, err)
+		log.Printf("Web: Error signaling workflow %s to cancel: %v", workflowID, err)
 		http.Error(w, "Failed to cancel order.", http.StatusInternalServerError)
 		return
-	}
-
-	// Update order status to cancelled immediately in the service (optimistic update, workflow will confirm)
-	err = s.orderService.CancelOrder(orderID) // Update status to cancelled in the service
-	if err != nil {
-		log.Printf("Error updating order status to cancelled in service: %v", err)
-		// Log error but still inform user of cancellation request - workflow is the source of truth
 	}
 
 	s.renderOrderList(w, r) // Re-render and send updated order list
@@ -189,7 +154,7 @@ func (s *WebServer) handleGetOrder(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	orderID := vars["id"]
 
-	order, err := s.orderService.GetOrder(orderID)
+	order, err := s.ordersRepo.GetOrder(orderID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Order not found: %v", err), http.StatusNotFound)
 		return
@@ -199,7 +164,6 @@ func (s *WebServer) handleGetOrder(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(order)
 }
 
-// handleSSEOrders handles the Server-Sent Events endpoint for order updates
 func (s *WebServer) handleSSEOrders(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -211,7 +175,7 @@ func (s *WebServer) handleSSEOrders(w http.ResponseWriter, r *http.Request) {
 		defer close(clientChan)
 		for {
 			// Fetch and render order list
-			orders, err := s.orderService.ListOrders()
+			orders, err := s.ordersRepo.ListOrders()
 			if err != nil {
 				log.Printf("Error fetching orders for SSE: %v", err)
 				// In a real app, consider more robust error handling and backoff
@@ -219,9 +183,8 @@ func (s *WebServer) handleSSEOrders(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			data := IndexPageData{Orders: orders}
 			var listBuffer bytes.Buffer
-			err = s.template.ExecuteTemplate(&listBuffer, "order_list.html", data.Orders) // Just render the order list
+			err = s.template.ExecuteTemplate(&listBuffer, "order_list.html", orders) // Just render the order list
 
 			if err != nil {
 				log.Printf("Template execution error for SSE: %v", err)
@@ -244,11 +207,11 @@ func (s *WebServer) handleSSEOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for msg := range clientChan {
-		fmt.Fprint(w, msg) // Send data to client
-		flusher.Flush()    // Flush data to client - very important for SSE
+		fmt.Fprint(w, msg)
+		flusher.Flush()
 	}
 
-	log.Println("SSE connection closed for orders") // Client disconnected or channel closed
+	log.Println("SSE connection closed for orders")
 }
 
 // compileTemplates parses the HTML templates (moved to main.go, but kept here for reference in web.go if needed)
@@ -263,7 +226,7 @@ func compileTemplates() (*template.Template, error) {
 	templates := template.New("").Funcs(funcMap)
 	templates, err = templates.ParseGlob("./html/*.html")
 	if err != nil {
-		return fmt.Errorf("template parsing error: %w", err)
+		return nil, fmt.Errorf("template parsing error: %w", err)
 	}
 
 	log.Println(templates.DefinedTemplates())
@@ -275,4 +238,3 @@ func compileTemplates() (*template.Template, error) {
 type IndexPageData struct {
 	Orders []StopLossOrder // Use StopLossOrder struct
 }
-

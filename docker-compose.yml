@@ -3,8 +3,12 @@ services:
     build:
       context: .
       dockerfile: services/price-simulator/Dockerfile
+    environment: 
+      - DISRUPTION_PROBABILITY=0 #0.666 # 😈 chance that the simulator will disconnect the client
     ports:
       - "8081:8080"
+    networks:
+      - temporal-network
 
   stop-loss:
     build:
@@ -14,14 +18,14 @@ services:
       - "3000:8080"
     depends_on:
       - temporal
-      - price-simulator
     environment:
+      - PRICE_WS_URL=ws://price-simulator:8080/prices
       - TEMPORAL_ADDRESS=temporal:7233
     networks:
       - temporal-network
     volumes: 
-      - ./services/stop-loss/data:/app/data  
       - ./services/stop-loss/html:/app/html
+      - ./services/stop-loss/data:/app/data
   
 # -------------------
 # Temporal services 👇

@@ -1,6 +1,8 @@
-{{ define "content" }}  <div class="container">
+{{ define "content" }}
+<div class="container">
     <h2>Place Stop-Loss Order</h2>
-    <form hx-post="/place-order" hx-target="#order-status-area" hx-swap="innerHTML">
+    <div id="toast-area" class="toast-container"></div>
+    <form id="order-form" hx-post="/orders" hx-target="#order-status-area" hx-swap="innerHTML" hx-on::after-request="handleOrderResponse(event)">
         <label for="security">Security:</label>
         <input type="text" id="security" name="security" required><br>
 
@@ -8,14 +10,12 @@
         <input type="number" id="price" name="price" step="0.01" required><br>
 
         <label for="quantity">Quantity:</label>
-        <input type="number" id="quantity" name="quantity" type="number" required><br>
-
-        <button type="submit">Place Order</button>
+        <input type="number" id="quantity" name="quantity" type="number" min="0" required><br>  <button type="submit">Place Order</button>
     </form>
 
     <h2>Order Status</h2>
-    <div id="order-status-area" hx-get="/sse-orders" hx-trigger="load, every 3s" hx-swap="innerHTML">
-        {{ template "order_list" .Orders }} </div>
+    <div id="order-status-area">  {{ template "order_list" .Orders }} <!- Initial load of orders -->
+    </div>
     <div id="sse-status">
         SSE Status: <span id="sse-connection-status">Connecting...</span>
     </div>
@@ -38,6 +38,75 @@
                 document.getElementById('order-status-area').innerHTML = event.data;
             };
         });
+
+        function handleOrderResponse(event) {
+            const toastArea = document.getElementById('toast-area');
+            const orderForm = document.getElementById('order-form');
+
+            if (event.detail.successful) {
+                // Success Toast
+                showToast(toastArea, 'Order placed successfully!', 'success');
+                orderForm.reset(); // Clear the form on success
+            } else {
+                // Error Toast
+                let errorMessage = 'Failed to place order.';
+                if (event.detail.xhr && event.detail.xhr.responseText) {
+                    errorMessage += ' ' + event.detail.xhr.responseText; // Optionally show server error
+                }
+                showToast(toastArea, errorMessage, 'error');
+            }
+        }
+
+        function showToast(toastArea, message, type) {
+            const toast = document.createElement('div');
+            toast.classList.add('toast', type); // 'success' or 'error' class for styling
+            toast.textContent = message;
+            toastArea.appendChild(toast);
+
+            // Simple fade-out animation and removal
+            setTimeout(() => {
+                toast.classList.add('fade-out'); // Add fade-out class to trigger animation
+                setTimeout(() => {
+                    toastArea.removeChild(toast); // Remove toast after animation
+                }, 500); // Animation duration (0.5s)
+            }, 3000); // Toast display duration (3s)
+        }
     </script>
+
+    <style>
+        .toast-container {
+            position: fixed; /* Fixed position for toast container */
+            top: 20px; /* Adjust as needed */
+            left: 50%;
+            transform: translateX(-50%); /* Center horizontally */
+            z-index: 1000; /* Ensure toasts are on top */
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Center toasts horizontally in container */
+            pointer-events: none; /* Allow clicks to pass through toast container */
+        }
+
+        .toast {
+            margin-bottom: 10px;
+            padding: 15px 25px;
+            border-radius: 5px;
+            color: white;
+            opacity: 1;
+            transition: opacity 0.5s ease-in-out; /* Fade out animation */
+            pointer-events: auto; /* Make toasts clickable if needed */
+        }
+
+        .toast.success {
+            background-color: #4CAF50; /* Green for success */
+        }
+
+        .toast.error {
+            background-color: #F44336; /* Red for error */
+        }
+
+        .toast.fade-out {
+            opacity: 0; /* Fade out animation */
+        }
+    </style>
 </div>
 {{ end }}

@@ -1,33 +1,44 @@
 package main
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
-// StopLossOrder struct - aligned with web.go and worker code
 type StopLossOrder struct {
 	ID         string    `json:"id"`
 	Security   string    `json:"security"`
-	StopPrice  float64   `json:"stopPrice"` // Changed to StopPrice and float64
+	StopPrice  float64   `json:"stopPrice"`
 	Quantity   int       `json:"quantity"`
-	Status     string    `json:"status"`               // pending, executed, cancelled - using constants below
-	PlacedAt   time.Time `json:"placedAt"`             // Aligned field name
+	Status     string    `json:"status"` // pending, executed, cancelled - using constants below
+	PlacedAt   time.Time `json:"placedAt"`
 	WorkflowID string    `json:"workflowID,omitempty"` // Temporal Workflow ID
 }
 
-// OrderServiceInterface - renamed and aligned with implementation and usage
-type OrderServiceInterface interface {
+type OrderWorkflowService interface {
+	CreateOrder(ctx context.Context, order StopLossOrder) error
+	CancelOrder(ctx context.Context, orderID string) error
+}
+
+type OrdersRepo interface {
 	CreateOrder(order StopLossOrder) (StopLossOrder, error)
 	GetOrder(orderID string) (StopLossOrder, error)
 	CancelOrder(orderID string) error
 	ListOrders() ([]StopLossOrder, error)
 	UpdateOrderStatus(orderID string, status string) error
 	AssociateWorkflowID(orderID string, workflowID string) error
-	GetWorkflowIDsForSecurity(security string) []string
-	GetOrdersForSecurity(security string) []StopLossOrder
+	GetPendingWorkflowIDsForSecurity(security string) ([]string, error)
+	GetOrdersForSecurity(security string) ([]StopLossOrder, error)
 }
 
 // PriceUpdateSignal is the signal type for price updates.
 type PriceUpdateSignal struct {
-	Price float64
+	Data PriceUpdateSignalData
+}
+
+type PriceUpdateSignalData struct {
+	Security string  `json:"security"`
+	Price    float64 `json:"price"`
 }
 
 // CancelOrderSignal is the signal type for order cancellation.

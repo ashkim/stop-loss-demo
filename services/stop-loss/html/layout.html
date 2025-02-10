@@ -19,10 +19,11 @@
             font-size: 0.8em;
             background-color: #eee;
             color: #333;
+            text-transform: uppercase; /* Minor CSS tweak: Uppercase status */
         }
-        .status-active { background-color: lightgreen; color: darkgreen; }
-        .status-triggered { background-color: lightcoral; color: darkred; }
-        .status-canceled { background-color: lightgray; color: gray; }
+        .status-pending { background-color: lightyellow; color: darkgoldenrod; } /* Added pending status color */
+        .status-executed { background-color: lightgreen; color: darkgreen; }
+        .status-cancelled { background-color: lightcoral; color: darkred; } /* Changed cancelled to lightcoral/darkred to differentiate from pending/executed */
         .cancel-button { padding: 5px 10px; background-color: #f44336; color: white; border: none; cursor: pointer; border-radius: 5px; font-size: 0.9em; }
         .cancel-button:hover { background-color: #d32f2f; }
 
@@ -33,7 +34,8 @@
         <h1>Stop-Loss Order Management</h1>
     </header>
 
-    {{ template "content" . }}  <footer>
+    {{ template "content" . }}
+    <footer>
         <p>&copy; 2024 Your Name - Interview Test</p>
     </footer>
 </body>

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -24,7 +26,7 @@ type PriceUpdate struct {
 
 var (
 	upgrader = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true }, // Allow all origins for this example
+		CheckOrigin: func(r *http.Request) bool { return true }, // Allow all origins
 	}
 	securityPrices = map[string]*Security{
 		"AAPL": {Symbol: "AAPL", Price: 150.00},
@@ -37,7 +39,16 @@ var (
 func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/prices", handlePriceStream)
-	go generatePrices()
+
+	disruptionProbabilityStr := os.Getenv("DISRUPTION_PROBABILITY")
+	disruptionProbability := 0.0 // Default: no disruption
+	if prob, err := strconv.ParseFloat(disruptionProbabilityStr, 64); err == nil {
+		disruptionProbability = prob
+	}
+	fmt.Printf("Price simulator started with disruption probability: %.2f\n", disruptionProbability)
+
+	go generatePrices()                          // Goroutine for price generation and broadcasting
+	go disruptConnections(disruptionProbability) // Separate goroutine for disruption simulation
 
 	fmt.Println("Starting price stream server on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
@@ -66,16 +77,10 @@ func handlePriceStream(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Client connected")
 
 	for {
-		// Keep the connection alive (optional - for demonstration purposes)
-		messageType, p, err := conn.ReadMessage()
+		messageType, _, err := conn.ReadMessage() // Discard read messages
 		if err != nil {
-			fmt.Println("read:", err)
-			break // Client disconnected
-		}
-
-		if messageType == websocket.TextMessage {
-			fmt.Printf("Received message: %s\n", p) //Handle any client messages if needed.
-			// For example, you could enable client side filtering here.
+			fmt.Println("read error:", err)
+			break // Exit loop on read error (client disconnect)
 		}
 
 		if messageType == websocket.CloseMessage {
@@ -86,13 +91,14 @@ func handlePriceStream(w http.ResponseWriter, r *http.Request) {
 }
 
 func generatePrices() {
+	fmt.Println("Starting price generator...")
 	for {
 		for _, security := range securityPrices {
 			// Simulate price change (random walk)
 			change := (rand.Float64() - 0.5) * security.Price * 0.01 // +/- 1% change
 			security.Price += change
 
-			// Ensure price stays positive
+			// Keep price positive
 			if security.Price < 0 {
 				security.Price = 0.01 // Small positive value
 			}
@@ -110,14 +116,56 @@ func generatePrices() {
 	}
 }
 
+// disruptConnections simulates random client disconnections based on probability.
+func disruptConnections(disruptionProbability float64) {
+	fmt.Println("Starting connection disruptor...")
+	if disruptionProbability <= 0 {
+		fmt.Println("Disruptions disabled (probability <= 0)")
+		return // Exit if disruption probability is not positive
+	}
+
+	for {
+		// Simulate disruption probabilistically
+		if rand.Float64() < disruptionProbability {
+			simulateDisruption()
+		}
+		time.Sleep(5 * time.Second) // Check for disruptions less frequently than price updates (e.g., every 5 seconds)
+	}
+}
+
+func simulateDisruption() {
+	clientsMu.Lock()
+	defer clientsMu.Unlock()
+
+	if len(clients) > 0 {
+		// Select a random client to disconnect
+		var clientToDisconnect *websocket.Conn = nil
+		clientIndex := rand.Intn(len(clients))
+		index := 0
+		for client := range clients {
+			if index == clientIndex {
+				clientToDisconnect = client
+				break
+			}
+			index++
+		}
+
+		if clientToDisconnect != nil {
+			fmt.Println("Simulating disruption - closing connection to a client.")
+			clientToDisconnect.Close()          // Simulate abrupt closure
+			delete(clients, clientToDisconnect) // Remove client from active list
+		}
+	}
+}
+
 func broadcastPrice(update PriceUpdate) {
 	message, _ := json.Marshal(update)
 	clientsMu.Lock()
 	for client := range clients {
 		err := client.WriteMessage(websocket.TextMessage, message)
 		if err != nil {
-			fmt.Println("write:", err)
-			// Client is likely disconnected, remove them.
+			fmt.Println("write error:", err)
+			// Client likely disconnected or in bad state, remove them.
 			delete(clients, client)
 		}
 	}
