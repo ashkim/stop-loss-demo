@@ -1,14 +1,14 @@
 {{ define "order_item" }}
     <div class="order-item">
         <p><strong>Security:</strong> {{ .Security }}</p>
-        <p><strong>Stop-Loss Price:</strong> {{ printf "%.2f" .StopLossPrice }}</p>
+        <p><strong>Stop-Loss Price:</strong> {{ printf "%.2f" .StopPrice }}</p>
         <p><strong>Quantity:</strong> {{ .Quantity }}</p>
         <p><strong>Status:</strong> <span class="order-status-badge status-{{ lower .Status }}">{{ .Status }}</span></p>
         <p><strong>Placed At:</strong> {{ .PlacedAt.Format "2006-01-02 15:04:05" }}</p>
-        {{ if eq .Status "active" }}
-            <form hx-post="/cancel-order/{{ .ID }}" hx-target="#order-status-area" hx-swap="innerHTML" style="display: inline-block;">
-                <button type="submit" class="cancel-button">Cancel Order</button>
-            </form>
-        {{ end }}
+        {{ if eq .Status "PENDING" }}
+            <form hx-post="/orders/{{ .ID }}/cancel" style="display: inline-block;">
+                <button type="submit" class="cancel-button">Cancel Order</button>
+            </form>
+        {{ end }}
     </div>
 {{ end }}

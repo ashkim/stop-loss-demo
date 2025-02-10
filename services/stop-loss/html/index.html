@@ -2,9 +2,13 @@
 <div class="container">
     <h2>Place Stop-Loss Order</h2>
     <div id="toast-area" class="toast-container"></div>
-    <form id="order-form" hx-post="/orders" hx-target="#order-status-area" hx-swap="innerHTML" hx-on::after-request="handleOrderResponse(event)">
+    <div id="fake-target"></div>
+    <form id="order-form" hx-post="/orders" hx-on::after-request="handleOrderResponse(event)" hx-target="fake-target">
         <label for="security">Security:</label>
-        <input type="text" id="security" name="security" required><br>
+        <select id="security" name="security" required>
+            <option value="AAPL">AAPL</option>
+            <option value="GOOG">GOOG</option>
+        </select><br>
 
         <label for="price">Stop-Loss Price:</label>
         <input type="number" id="price" name="price" step="0.01" required><br>
@@ -14,31 +18,9 @@
     </form>
 
     <h2>Order Status</h2>
-    <div id="order-status-area">  {{ template "order_list" .Orders }} <!- Initial load of orders -->
-    </div>
-    <div id="sse-status">
-        SSE Status: <span id="sse-connection-status">Connecting...</span>
+    <div id="order-status-area" hx-ext="sse" sse-connect="/sse-orders">
     </div>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const sseStatusSpan = document.getElementById('sse-connection-status');
-            const eventSource = new EventSource("/sse-orders");
-
-            eventSource.onopen = () => {
-                sseStatusSpan.textContent = 'Connected';
-                sseStatusSpan.style.color = 'green';
-            };
-
-            eventSource.onerror = () => {
-                sseStatusSpan.textContent = 'Error';
-                sseStatusSpan.style.color = 'red';
-            };
-
-            eventSource.onmessage = (event) => {
-                document.getElementById('order-status-area').innerHTML = event.data;
-            };
-        });
-
         function handleOrderResponse(event) {
             const toastArea = document.getElementById('toast-area');
             const orderForm = document.getElementById('order-form');

@@ -1,5 +1,6 @@
 services:
   price-simulator:
+    container_name: price-simulator
     build:
       context: .
       dockerfile: services/price-simulator/Dockerfile
@@ -11,6 +12,7 @@ services:
       - temporal-network
 
   stop-loss:
+    container_name: stop-loss-server 
     build:
       context: .
       dockerfile: services/stop-loss/Dockerfile

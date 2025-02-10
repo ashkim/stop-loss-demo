@@ -78,9 +78,8 @@ func StopLossWorkflow(ctx workflow.Context, order StopLossOrder) error {
 
 	selector := workflow.NewSelector(ctx)
 
-	// **Wrap the selector in a for loop to keep listening**
 	for !isOrderExecuted && !isOrderCancelled {
-		selector = workflow.NewSelector(ctx) // Re-create selector in each loop iteration
+		selector = workflow.NewSelector(ctx)
 
 		selector.AddReceive(priceUpdateChannel, func(c workflow.ReceiveChannel, more bool) {
 			var signalData PriceUpdateSignalData
@@ -92,7 +91,7 @@ func StopLossWorkflow(ctx workflow.Context, order StopLossOrder) error {
 			}
 
 			currentPrice := signalData.Price
-			logger.Info("Received price update", "security", signalData.Security, "price", currentPrice, "stopPrice", order.StopPrice, "isOrderExecuted", isOrderExecuted, "isOrderCancelled", isOrderCancelled)
+			logger.Debug("Received price update", "security", signalData.Security, "price", currentPrice, "stopPrice", order.StopPrice, "isOrderExecuted", isOrderExecuted, "isOrderCancelled", isOrderCancelled)
 
 			if currentPrice <= order.StopPrice && !isOrderExecuted && !isOrderCancelled {
 				logger.Info("Stop-loss price reached 📉!", "security", order.Security, "currentPrice", currentPrice, "stopPrice", order.StopPrice)
@@ -115,8 +114,6 @@ func StopLossWorkflow(ctx workflow.Context, order StopLossOrder) error {
 				}
 
 				logger.Info("StopLossWorkflow executed for order", "orderID", order.ID, "runID", runID)
-				// **Do NOT return here - exit loop instead**
-				// return // Exit workflow after execution - REMOVED
 			} else if currentPrice > order.StopPrice {
 				logger.Debug("Price above stop-loss, waiting for trigger", "security", order.Security, "currentPrice", currentPrice, "stopPrice", order.StopPrice)
 			}
@@ -130,17 +127,12 @@ func StopLossWorkflow(ctx workflow.Context, order StopLossOrder) error {
 				logger.Error("Failed to update order status to CANCELLED", "error", err)
 			}
 			logger.Info("StopLossWorkflow cancelled for order", "orderID", order.ID, "runID", runID)
-			// **Do NOT return here - exit loop instead**
-			// return // Exit workflow on cancellation - REMOVED
 		})
 
 		// Wait for either price signal OR cancellation signal within the selector:
 		selector.Select(ctx)
-		logger.Debug("Selector completed, looping again or exiting...") // Debug log to track loop iterations
 	}
-
-	logger.Info("StopLossWorkflow exiting selector loop and workflow", "orderID", order.ID, "runID", runID, "isOrderExecuted", isOrderExecuted, "isOrderCancelled", isOrderCancelled)
-	return nil // Workflow completes after loop exits (execution or cancellation)
+	return nil
 }
 
 // ExecuteOrderActivity - remains the same
@@ -155,7 +147,7 @@ func CreateOrderActivity(ctx context.Context, order StopLossOrder, ordersRepo Or
 	log.Printf("Creating order: ", order)
 	_, err := ordersRepo.CreateOrder(order)
 	if err != nil {
-		return fmt.Errorf("failed to create order %s", order.ID, err)
+		return fmt.Errorf("failed to create order %s %v", order.ID, err)
 	}
 	return nil
 }

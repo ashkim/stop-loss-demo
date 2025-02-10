@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 type StopLossOrder struct {
@@ -29,6 +31,19 @@ type OrdersRepo interface {
 	AssociateWorkflowID(orderID string, workflowID string) error
 	GetPendingWorkflowIDsForSecurity(security string) ([]string, error)
 	GetOrdersForSecurity(security string) ([]StopLossOrder, error)
+}
+
+// PriceIngestionService manages the WebSocket connection and price updates.
+type PriceIngestionService struct {
+	wsURL         string
+	conn          *websocket.Conn
+	pricesChannel chan PriceUpdate // Channel to publish price updates
+}
+
+// PriceUpdate struct to hold price update information
+type PriceUpdate struct {
+	Security string  `json:"security"`
+	Price    float64 `json:"price"`
 }
 
 // PriceUpdateSignal is the signal type for price updates.

@@ -2,6 +2,9 @@
 go.mod
 go.sum
 
+# data file
+./services/stop-loss/data/orders.db
+
 # Dependencies
 vendor/
 

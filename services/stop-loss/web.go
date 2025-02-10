@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -32,9 +31,7 @@ func NewWebServer(tpl *template.Template, tc client.Client, repo OrdersRepo, ord
 func (s *WebServer) SetupRoutes(mux *mux.Router) {
 	mux.HandleFunc("/", s.handleIndex).Methods("GET")
 	mux.HandleFunc("/orders", s.handleCreateOrder).Methods("POST")
-	mux.HandleFunc("/orders", s.handleListOrders).Methods("GET")
-	mux.HandleFunc("/orders/{id}/cancel", s.handleCancelOrder).Methods("POST") // Cancellation endpoint
-	mux.HandleFunc("/orders/{id}", s.handleGetOrder).Methods("GET")
+	mux.HandleFunc("/orders/{id}/cancel", s.handleCancelOrder).Methods("POST")
 	mux.HandleFunc("/sse-orders", s.handleSSEOrders).Methods("GET") // SSE endpoint
 }
 
@@ -63,8 +60,6 @@ func (s *WebServer) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	priceStr := r.FormValue("price")
 	quantityStr := r.FormValue("quantity")
 
-	// TODO: add known security validation
-
 	price, err := strconv.ParseFloat(priceStr, 64)
 	if err != nil {
 		http.Error(w, "Invalid price", http.StatusBadRequest)
@@ -90,30 +85,6 @@ func (s *WebServer) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Failed to create order: %v", err), http.StatusInternalServerError)
 		return
 	}
-}
-
-// handleListOrders fetches and renders the list of orders (used by SSE and initial load)
-func (s *WebServer) handleListOrders(w http.ResponseWriter, r *http.Request) {
-	s.renderOrderList(w, r)
-}
-
-func (s *WebServer) renderOrderList(w http.ResponseWriter, r *http.Request) {
-	orders, err := s.ordersRepo.ListOrders()
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to load orders: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	var listBuffer bytes.Buffer
-	err = s.template.ExecuteTemplate(&listBuffer, "order_list.html", orders) // Render just the order list part
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Template execution error for order list: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8") // Important for HTMX swap
-	w.WriteHeader(http.StatusOK)
-	w.Write(listBuffer.Bytes()) // Write the buffer to the response
 }
 
 // handleCancelOrder handles order cancellation requests
@@ -145,23 +116,6 @@ func (s *WebServer) handleCancelOrder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to cancel order.", http.StatusInternalServerError)
 		return
 	}
-
-	s.renderOrderList(w, r) // Re-render and send updated order list
-}
-
-// handleGetOrder retrieves and displays details for a single order (not directly used in UI yet but good for API)
-func (s *WebServer) handleGetOrder(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	orderID := vars["id"]
-
-	order, err := s.ordersRepo.GetOrder(orderID)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Order not found: %v", err), http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(order)
 }
 
 func (s *WebServer) handleSSEOrders(w http.ResponseWriter, r *http.Request) {
@@ -184,7 +138,7 @@ func (s *WebServer) handleSSEOrders(w http.ResponseWriter, r *http.Request) {
 			}
 
 			var listBuffer bytes.Buffer
-			err = s.template.ExecuteTemplate(&listBuffer, "order_list.html", orders) // Just render the order list
+			err = s.template.ExecuteTemplate(&listBuffer, "orders_sse.html", orders) // Just render the order list
 
 			if err != nil {
 				log.Printf("Template execution error for SSE: %v", err)

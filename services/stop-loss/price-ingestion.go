@@ -8,20 +8,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// PriceIngestionService manages the WebSocket connection and price updates.
-type PriceIngestionService struct {
-	wsURL         string
-	conn          *websocket.Conn
-	pricesChannel chan PriceUpdate // Channel to publish price updates
-}
-
-// PriceUpdate struct to hold price update information
-type PriceUpdate struct {
-	Security string  `json:"security"`
-	Price    float64 `json:"price"`
-}
-
-// NewPriceIngestionService creates a new PriceIngestionService.
 func NewPriceIngestionService(wsURL string, pricesChannel chan PriceUpdate) *PriceIngestionService {
 	return &PriceIngestionService{
 		wsURL:         wsURL,
@@ -29,7 +15,6 @@ func NewPriceIngestionService(wsURL string, pricesChannel chan PriceUpdate) *Pri
 	}
 }
 
-// Start starts the PriceIngestionService, establishing WebSocket connection and handling reconnection.
 func (pis *PriceIngestionService) Start() {
 	log.Println("Starting Price Ingestion Service...")
 	go pis.run()
@@ -78,7 +63,7 @@ func (pis *PriceIngestionService) startReceivingPrices() {
 			continue
 		}
 
-		//log.Printf("Received price update: Security=%s, Price=%.2f", priceUpdate.Security, priceUpdate.Price)
+		log.Printf("Received price update: Security=%s, Price=%.2f", priceUpdate.Security, priceUpdate.Price)
 		pis.pricesChannel <- priceUpdate
 	}
 }
