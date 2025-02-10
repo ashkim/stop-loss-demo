@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: services/price-simulator/Dockerfile
     environment: 
-      - DISRUPTION_PROBABILITY=0 #0.666 # 😈 chance that the simulator will disconnect the client
+      - DISRUPTION_PROBABILITY=0.666 # 😈 chance that the simulator will disconnect the client
     ports:
       - "8081:8080"
     networks:

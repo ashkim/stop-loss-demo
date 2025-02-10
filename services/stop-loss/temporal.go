@@ -16,12 +16,11 @@ func WaitDialTemporal(hostAddress string, connectionRetryAttempts int) (client.C
 			HostPort: hostAddress,
 		})
 		if err == nil {
-			// Success! Connected to Temporal.
-			log.Println("Successfully connected to Temporal server.") // Added success log
+			log.Println("Successfully connected to Temporal server.")
 			return c, nil
 		}
 		log.Printf("Failed to connect to Temporal (attempt %d/%d): %v. Retrying in %ds...", i+1, connectionRetryAttempts, err, 5)
-		time.Sleep(5 * time.Second) // Wait for 5 seconds before retrying
+		time.Sleep(5 * time.Second)
 	}
 
 	// After all retry attempts, if still failed:

@@ -175,3 +175,37 @@ func (s *OrdersRepoSQLite) GetOrdersForSecurity(security string) ([]StopLossOrde
 
 // Ensure OrdersRepoSQLite implements OrdersRepo
 var _ OrdersRepo = (*OrdersRepoSQLite)(nil)
+
+// --- Utility Functions for SQLite ---
+
+func openSQLiteDB(dbFilePath string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", dbFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	// Set connection limits for better performance in some scenarios
+	db.SetMaxOpenConns(10)           // Adjust as needed
+	db.SetMaxIdleConns(5)            // Adjust as needed
+	db.SetConnMaxLifetime(time.Hour) // Adjust as needed
+
+	return db, nil
+}
+
+func createOrdersTable(db *sql.DB) error {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS orders (
+			id TEXT PRIMARY KEY,
+			security TEXT NOT NULL,
+			stop_price REAL NOT NULL,
+			quantity INTEGER NOT NULL,
+			status TEXT NOT NULL,
+			placed_at DATETIME NOT NULL,
+			workflow_id TEXT
+		);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create orders table: %w", err)
+	}
+	return nil
+}

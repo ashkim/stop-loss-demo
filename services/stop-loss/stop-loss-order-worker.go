@@ -135,7 +135,6 @@ func StopLossWorkflow(ctx workflow.Context, order StopLossOrder) error {
 	return nil
 }
 
-// ExecuteOrderActivity - remains the same
 func ExecuteOrderActivity(ctx context.Context, security string, quantity int) (string, error) {
 	log.Printf("Executing order for %d shares of %s", quantity, security)
 	time.Sleep(2 * time.Second) // Simulate order execution delay - this is a mock implementation

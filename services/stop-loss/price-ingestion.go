@@ -48,7 +48,7 @@ func (pis *PriceIngestionService) startReceivingPrices() {
 	for {
 		_, message, err := pis.conn.ReadMessage()
 		if err != nil {
-			log.Println("WebSocket ReadMessage error:", err) // More general read error log
+			log.Println("WebSocket ReadMessage error:", err)
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Println("WebSocket connection closed by remote side (expected close error).")
 			} else {

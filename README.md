@@ -49,7 +49,7 @@ make clean
 ## Prerequisites
 - Docker and docker-compose
 
-# optional:
+### optional:
 - wscat (`npm install -g wscat`) for WebSocket testing
 - sqlite3 command-line tool
 - golangci-lint for linting
