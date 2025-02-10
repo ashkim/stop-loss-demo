@@ -2,8 +2,7 @@
 <div class="container">
     <h2>Place Stop-Loss Order</h2>
     <div id="toast-area" class="toast-container"></div>
-    <div id="fake-target"></div>
-    <form id="order-form" hx-post="/orders" hx-on::after-request="handleOrderResponse(event)" hx-target="fake-target">
+    <form id="order-form" hx-post="/orders" hx-target="#order-status-area" hx-swap="innerHTML" hx-on::after-request="handleOrderResponse(event)">
         <label for="security">Security:</label>
         <select id="security" name="security" required>
             <option value="AAPL">AAPL</option>
@@ -18,7 +17,10 @@
     </form>
 
     <h2>Order Status</h2>
-    <div id="order-status-area" hx-ext="sse" sse-connect="/sse-orders">
+    <div id="order-status-area" 
+        hx-get="/orders" 
+        hx-trigger="load, every 3s" 
+        hx-swap="innerHTML">
     </div>
     <script>
         function handleOrderResponse(event) {

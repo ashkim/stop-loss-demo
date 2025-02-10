@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"html/template"
 	"log"
@@ -31,8 +30,8 @@ func NewWebServer(tpl *template.Template, tc client.Client, repo OrdersRepo, ord
 func (s *WebServer) SetupRoutes(mux *mux.Router) {
 	mux.HandleFunc("/", s.handleIndex).Methods("GET")
 	mux.HandleFunc("/orders", s.handleCreateOrder).Methods("POST")
+	mux.HandleFunc("/orders", s.handleGetOrders).Methods("GET")
 	mux.HandleFunc("/orders/{id}/cancel", s.handleCancelOrder).Methods("POST")
-	mux.HandleFunc("/sse-orders", s.handleSSEOrders).Methods("GET") // SSE endpoint
 }
 
 // handleIndex renders the main index page
@@ -87,6 +86,18 @@ func (s *WebServer) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *WebServer) handleGetOrders(w http.ResponseWriter, r *http.Request) {
+	orders, err := s.ordersRepo.ListOrders()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to load orders: %v", err), http.StatusInternalServerError)
+		return
+	}
+	err = s.template.ExecuteTemplate(w, "orders_list.html", orders)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Template execution error: %v", err), http.StatusInternalServerError)
+	}
+}
+
 // handleCancelOrder handles order cancellation requests
 func (s *WebServer) handleCancelOrder(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -116,56 +127,6 @@ func (s *WebServer) handleCancelOrder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to cancel order.", http.StatusInternalServerError)
 		return
 	}
-}
-
-func (s *WebServer) handleSSEOrders(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-
-	log.Println("SSE connection established for orders")
-	clientChan := make(chan string) // Channel to send SSE events to client
-	go func() {
-		defer close(clientChan)
-		for {
-			// Fetch and render order list
-			orders, err := s.ordersRepo.ListOrders()
-			if err != nil {
-				log.Printf("Error fetching orders for SSE: %v", err)
-				// In a real app, consider more robust error handling and backoff
-				time.Sleep(5 * time.Second) // Backoff on error
-				continue
-			}
-
-			var listBuffer bytes.Buffer
-			err = s.template.ExecuteTemplate(&listBuffer, "orders_sse.html", orders) // Just render the order list
-
-			if err != nil {
-				log.Printf("Template execution error for SSE: %v", err)
-				time.Sleep(5 * time.Second) // Backoff on template error
-				continue
-			}
-
-			// Send SSE event with rendered HTML
-			eventData := fmt.Sprintf("data: %s\n\n", listBuffer.String()) // SSE format: "data: <payload>\n\n"
-			clientChan <- eventData
-
-			time.Sleep(3 * time.Second) // Polling interval - adjust as needed
-		}
-	}()
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming not supported!", http.StatusInternalServerError)
-		return
-	}
-
-	for msg := range clientChan {
-		fmt.Fprint(w, msg)
-		flusher.Flush()
-	}
-
-	log.Println("SSE connection closed for orders")
 }
 
 // compileTemplates parses the HTML templates (moved to main.go, but kept here for reference in web.go if needed)
