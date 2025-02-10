@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"go.temporal.io/sdk/client"
@@ -25,14 +24,13 @@ func ExecuteOrderActivity(ctx context.Context, security string, quantity int) (s
 	return "Order executed successfully", nil
 }
 
-func WaitDialTemporal() (client.Client, error) {
+func WaitDialTemporal(hostAddress string, connectionRetryAttempts int) (client.Client, error) {
 	var c client.Client
 	var err error
-	connectionRetryAttempts := 3
 
 	for i := 0; i < connectionRetryAttempts; i++ {
 		c, err = client.Dial(client.Options{
-			HostPort: os.Getenv("TEMPORAL_ADDRESS"), // Get from env variable
+			HostPort: hostAddress,
 		})
 		if err == nil {
 			// success

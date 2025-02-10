@@ -4,10 +4,19 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
 func main() {
+
+	temporalClient, err := WaitDialTemporal(os.Getenv("TEMPORAL_ADDRESS"), 10)
+	if err != nil {
+		log.Fatal("failed to connect to temporal server: ", err)
+	}
+
+	go StartWorker(temporalClient)
+
 	if err := compileTemplates(); err != nil {
 		log.Fatalf("Failed to compile templates: %v", err)
 	}
