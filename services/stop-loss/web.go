@@ -34,9 +34,7 @@ func (s *WebServer) SetupRoutes(mux *mux.Router) {
 	mux.HandleFunc("/orders/{id}/cancel", s.handleCancelOrder).Methods("POST")
 }
 
-// handleIndex renders the main index page
 func (s *WebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
-	log.Println("Loading index page")
 	orders, err := s.ordersRepo.ListOrders()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to load orders: %v", err), http.StatusInternalServerError)
@@ -98,7 +96,6 @@ func (s *WebServer) handleGetOrders(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleCancelOrder handles order cancellation requests
 func (s *WebServer) handleCancelOrder(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	orderID := vars["id"]
@@ -129,7 +126,6 @@ func (s *WebServer) handleCancelOrder(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// compileTemplates parses the HTML templates (moved to main.go, but kept here for reference in web.go if needed)
 func compileTemplates() (*template.Template, error) {
 	var err error
 	funcMap := template.FuncMap{
@@ -149,7 +145,6 @@ func compileTemplates() (*template.Template, error) {
 	return templates, nil
 }
 
-// Define a struct to hold data for the index page (moved to web.go as it's web-specific)
 type IndexPageData struct {
 	Orders []StopLossOrder // Use StopLossOrder struct
 }

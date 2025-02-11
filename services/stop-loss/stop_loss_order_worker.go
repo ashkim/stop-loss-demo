@@ -43,7 +43,7 @@ func StartLossOrderWorker(temporalClient client.Client, ordersRepo OrdersRepo) {
 
 func StopLossWorkflow(ctx workflow.Context, order StopLossOrder) error {
 	options := workflow.ActivityOptions{
-		ScheduleToCloseTimeout: time.Minute * 5,
+		ScheduleToCloseTimeout: 0, // never timeout
 		HeartbeatTimeout:       time.Second * 30,
 		RetryPolicy: &temporal.RetryPolicy{
 			InitialInterval:    time.Second * 5,
@@ -159,4 +159,3 @@ func UpdateOrderStatusActivity(ctx context.Context, orderID string, status strin
 	}
 	return nil
 }
-
