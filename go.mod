@@ -5,7 +5,7 @@ go 1.23.3
 require (
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
-	go.temporal.io/api v1.43.0
+	go.temporal.io/api v1.44.1
 	go.temporal.io/sdk v1.32.1
 )
 
